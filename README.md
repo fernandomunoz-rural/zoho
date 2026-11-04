@@ -7,6 +7,20 @@ All data is synthetic test data from the case-study workbook (26 source rows mer
 ## Run it
 Open `index.html` in any browser. No install or server is needed. Changes are saved in your browser only; use **Setup → Data Administration → Reset all demo data** to start over.
 
+## Deploy
+The site is the single file `index.html`: no build step, no server code, no API keys. Any static host works (GitHub Pages, Netlify, Cloudflare Pages); publish the repository root. Only `index.html` needs to be served (`tests/`, `package.json` and `README.md` are not used by the site).
+
+- Each visitor gets their own copy of the demo data in their browser (`localStorage` key `crm-mockup-ensign-v1`). Nothing is shared between visitors and nothing is sent anywhere.
+- Data saved by an older version is upgraded on load (missing collections are added). If a future change makes old saved data unusable, change the `STORE` key in `index.html` so every visitor starts from the seed data.
+- Excel (.xlsx) import loads SheetJS 0.18.5 from cdnjs with a pinned integrity hash. Without internet access, CSV import still works.
+
+## Tests
+```
+npm install
+npm test
+```
+Serves the folder over HTTP and runs, in Google Chrome (or `CHROME_PATH`): a syntax check; a crawl of every page at desktop and phone width (JS errors, horizontal overflow, `undefined`/`NaN` text); a click on every control; the main workflows (create, duplicate check, inline edit, notes, tasks, staged merge and reversal, import wizard, review, undo, role restrictions, CSV export, delete, reset, old or corrupt saved data); and Excel import with and without the CDN.
+
 ## What it includes
 - **Modules:** Contacts, Accounts, Education History, Employment History, Match & Merge Log, EC - Internships, EC - Projects, EC - Employer Visits, Activities
 - **Roles** (switch with "Viewing as" in the top bar): Administrator, Employer Relations, Alumni Services, Data Steward. Each role gets its own page layout, field permissions and saved views.

@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CRM Sandbox Mockup</title>
+<meta name="description" content="Clickable CRM sandbox mockup for the Ensign College alumni and employer-relations case study. Synthetic test data only.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect width='9' height='9' fill='%23e42527'/%3E%3Crect x='11' width='9' height='9' fill='%23089949'/%3E%3Crect y='11' width='9' height='9' fill='%23226db4'/%3E%3Crect x='11' y='11' width='9' height='9' fill='%23f9b21d'/%3E%3C/svg%3E">
 <style>
 :root{--bg:#f2f4f7;--panel:#fff;--panel2:#f7f8fa;--card:#fff;--border:#e1e4ea;--text:#1d2129;--muted:#6b7280;--accent:#2f6fed;--primary:#6c4ad0;--primaryH:#5b3cc0;--hover:#eef2fb;--top:#1f2433;--topText:#e8eaf0;--side:#fff;--chip:#eef0f4;--danger:#e5484d;--ok:#16a34a;--warn:#d97706;--shadow:0 8px 28px rgba(0,0,0,.14);--sel:#e8efff;--grid:#d9dde4}
 [data-theme=dark]{--bg:#121417;--panel:#1b1e23;--panel2:#202329;--card:#24272d;--border:#33373f;--text:#e6e8eb;--muted:#9aa1ab;--accent:#5b9bff;--hover:#2a2e36;--top:#0d0f12;--topText:#e6e8eb;--side:#16191d;--chip:#2c3038;--shadow:0 8px 28px rgba(0,0,0,.55);--sel:#24324d;--grid:#3a3f48}
@@ -228,11 +230,16 @@ td.nw{white-space:nowrap}
 .radio-list input{margin-top:3px}
 .sub{font-size:12px;color:var(--muted)}
 .card h3 .sp{flex:1}
+.grid>*,.cols2>*,.cols3>*,.secgrid>*,.card{min-width:0}
+.cb:has(>.t),.card:has(>.t),.cb:has(>.tw){overflow-x:auto}
 @media (max-width:900px){
+ .frow{grid-template-columns:minmax(0,38%) minmax(0,1fr)}.main .chip{white-space:normal;max-width:100%}
  .body{grid-template-columns:1fr}.side{display:none}.side.open{display:block;position:fixed;top:50px;bottom:0;left:0;width:240px;z-index:60;box-shadow:var(--shadow)}
- .listwrap,.dwrap,.setwrap{grid-template-columns:minmax(0,1fr)}.body{grid-template-columns:minmax(0,1fr)}.dhead>div{min-width:0;flex:1 1 200px}.dhead .chip,.dhead .badge{white-space:normal}.dhead h1{font-size:17px}.fpanel,.rnav{display:none}
+ .listwrap,.dwrap,.setwrap{grid-template-columns:minmax(0,1fr)}.body{grid-template-columns:minmax(0,1fr)}.dhead>div{min-width:0;flex:1 1 200px}.dhead>.big{flex:none}.dhead .chip,.dhead .badge{white-space:normal}.dhead h1{font-size:17px}.fpanel,.rnav{display:none}
  .cols2,.cols3,.secgrid,.fgrid{grid-template-columns:1fr}.logo{min-width:0}.org,.hidem{display:none}
  .pair{grid-template-columns:1fr}.pair>div+div{border-left:0;border-top:1px solid var(--border)}
+ .app{grid-template-columns:minmax(0,1fr)}.top{gap:6px;padding:0 8px;min-width:0}.search{min-width:0}.rolesel{max-width:118px;min-width:0}
+ .top a[href="#/setup"],.top .avatar{display:none}
 }
 @media (min-width:901px){.mtoggle{display:none}}
 </style>
@@ -401,7 +408,11 @@ function seed(){
  return db}
 
 let DB;
-function load(){try{const s=localStorage.getItem(STORE);if(s){DB=JSON.parse(s);return}}catch(e){}DB=seed()}
+function load(){let s=null;try{s=JSON.parse(localStorage.getItem(STORE))}catch(e){}
+ const base=seed();if(!s||typeof s!=='object'||!Array.isArray(s.contacts)){DB=base;return}
+ // Data saved by an older version may lack newer collections: add them empty (objects keep their default shape) so no page crashes.
+ Object.keys(base).forEach(k=>{const b=base[k];if(Array.isArray(b)){if(!Array.isArray(s[k]))s[k]=[]}else if(b&&typeof b==='object'){s[k]=s[k]&&typeof s[k]==='object'&&!Array.isArray(s[k])?{...b,...s[k]}:b}else if(s[k]===undefined)s[k]=b});
+ DB=s}
 function save(){try{localStorage.setItem(STORE,JSON.stringify(DB))}catch(e){}}
 load();DB.customViews=DB.customViews||[];DB.batches=DB.batches||[];DB.favs=DB.favs||{};
 
@@ -520,7 +531,12 @@ function disp(m,k,r,opt={}){const f=MOD[m].fmap[k]||{};const v=getVal(m,r,k);
  return esc(v)}
 
 /* ---------- mutation helpers ---------- */
-function nextId(m){const p=MOD[m]?.prefix||m.toUpperCase().slice(0,2);DB.seq[m]=(DB.seq[m]||1);const id=`${p}-${String(DB.seq[m]++).padStart(3,'0')}`;return id}
+// Records whose required lookup points at (m,id): they are removed with it. The Match & Merge Log is an audit trail and is never touched.
+function delChildren(m,id){const out=[];Object.entries(MOD).forEach(([k,M])=>{if(k==='log'||!Array.isArray(DB[k]))return;M.fields.forEach(f=>{if(f.t==='lookup'&&f.to===m&&f.req)DB[k].forEach(r=>{if(r[f.k]===id)out.push({m:k,id:r.id})})})});return out}
+function deleteRecord(m,id){delChildren(m,id).forEach(c=>deleteRecord(c.m,c.id));DB[m]=DB[m].filter(r=>r.id!==id);
+ Object.entries(MOD).forEach(([k,M])=>{if(k==='log'||!Array.isArray(DB[k]))return;M.fields.forEach(f=>{if(f.t==='lookup'&&f.to===m&&!f.req)DB[k].forEach(r=>{if(r[f.k]===id){r[f.k]='';tl(k,r.id,`${f.l} cleared: linked ${MOD[m].single} ${id} was deleted.`)}})})});
+ DB.tasks=DB.tasks.filter(t=>!(t.mod===m&&t.rid===id));DB.notes=DB.notes.filter(n=>!(n.mod===m&&n.rid===id));DB.timeline=DB.timeline.filter(t=>!(t.mod===m&&t.rid===id))}
+function nextId(m){const p=MOD[m]?.prefix||m.toUpperCase().slice(0,2);const re=new RegExp('^'+p+'-(\\d+)$');const top=(Array.isArray(DB[m])?DB[m]:[]).reduce((n,r)=>{const x=re.exec((r&&r.id)||'');return x?Math.max(n,+x[1]):n},0);DB.seq[m]=Math.max(DB.seq[m]||1,top+1);const id=`${p}-${String(DB.seq[m]++).padStart(3,'0')}`;return id}
 function tl(m,rid,text){DB.timeline.push({mod:m,rid,at:nowISO(),by:me(),text})}
 function setField(m,id,k,val){const r=byId(m,id);const f=MOD[m].fmap[k];const old=plain(m,k,r);
  if(f.unique&&val&&DB[m].some(x=>x.id!==id&&lc(x[k])===lc(val))){toast(`Duplicate check: ${f.l} must be unique — ${val} already belongs to another record. Route through Import Review instead.`);return false}
@@ -774,7 +790,7 @@ function parseCSV(t){const rows=[];let row=[],f='',q=false;for(let i=0;i<t.lengt
 function tableFrom(rows){const ne=r=>r.filter(x=>String(x??'').trim()).length;const mx=Math.max(0,...rows.map(ne));const hi=Math.max(0,rows.findIndex(r=>ne(r)>=Math.max(2,Math.ceil(mx*0.6))));let headers=(rows[hi]||[]).map(x=>String(x??'').trim());let hc=headers.length;while(hc>0&&!headers[hc-1])hc--;headers=headers.slice(0,hc);
  const data=rows.slice(hi+1).filter(r=>ne(r)>=2&&!/^canonical|^records reviewed|^total/i.test(String(r[0]||''))).map(r=>headers.map((_,i)=>String(r[i]??'').trim()));return{headers,rows:data}}
 const toISO=v=>{if(!v)return'';if(/^\d{4}-\d{2}-\d{2}/.test(v))return v.slice(0,10);const d=new Date(v);return isNaN(d)?'':d.toISOString().slice(0,10)};
-function loadXLSX(){return window.XLSX?Promise.resolve():new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+function loadXLSX(){return window.XLSX?Promise.resolve():new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.integrity='sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==';s.crossOrigin='anonymous';s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
 async function loadFile(file){const w=S.wiz;w.fileName=file.name;w.sheets=null;
  if(/\.(csv|txt)$/i.test(file.name)){setTable(tableFrom(parseCSV(await file.text())));return}
  if(/\.xlsx?$/i.test(file.name)){try{await loadXLSX();const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true,dateNF:'yyyy-mm-dd'});w.wb=wb;w.sheets=wb.SheetNames;w.sheet=wb.SheetNames.find(n=>w.m==='contacts'?/source|contact|import/i.test(n):/account|compan|employer/i.test(n))||wb.SheetNames[0];readSheet()}catch(e){toast('Could not read the Excel file. The Excel reader needs an internet connection; you can also save the sheet as CSV and upload that.')}return}
@@ -1005,7 +1021,7 @@ document.addEventListener('click',e=>{
  case'addnote':{const t=$('#newnote').value.trim();if(!t)return;DB.notes.push({id:nextId('notes'),mod:m,rid:id,text:t,by:me(),at:nowISO()});tl(m,id,'Note added.');save();S._keep=true;render();break}
  case'email':e.preventDefault();toast(`Compose email to ${v} (mock — no email is sent)`);break;
  case'print':window.print();break;
- case'del':if(role()!=='admin'){toast('Restricted: Contacts are merged or removed only through the Import & Review process.');return}if(confirm('Delete this record? (Sandbox)')){DB[m]=DB[m].filter(r=>r.id!==id);save();location.hash='#/'+m}break;
+ case'del':if(role()!=='admin'){toast('Restricted: Contacts are merged or removed only through the Import & Review process.');return}{const kids=delChildren(m,id);if(confirm(`Delete this record? (Sandbox)${kids.length?`\n\nThis also removes ${kids.length} linked record(s) that cannot exist without it (${[...new Set(kids.map(k=>MOD[k.m].label))].join(', ')}).`:''}`)){deleteRecord(m,id);save();toast(`${MOD[m].single} deleted`);location.hash='#/'+m}}break;
  case'massdel':toast(role()==='admin'?'Mass delete is disabled in this sandbox. Use Import & Review to merge duplicates.':'Restricted: only Administrators can delete, and merges go through review.');break;
  case'findmerge':location.hash='#/import';break;
  case'iedit':{if(el.querySelector('.edbox'))return;const f=MOD[m].fmap[el.dataset.k];const r=byId(m,id);el.classList.remove('ed');el.innerHTML=`<div class="edbox">${inputFor(f,r[f.k],m)}<div class="row"><button class="btn sm pr" data-a="isave" data-m="${m}" data-id="${id}" data-k="${f.k}">Save</button><button class="btn sm" data-a="icancel">Cancel</button></div></div>`;el.querySelector('input,select,textarea')?.focus();break}
